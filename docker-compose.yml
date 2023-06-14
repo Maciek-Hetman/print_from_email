@@ -1,0 +1,16 @@
+version: '3.4'
+
+services:
+  print_from_email:
+    image: python:latest
+    command: python3 runserver_daemon.python
+    ports:
+      - 8000:8000
+    working_dir: /app
+    volumes:
+      - /var/run/cups:/var/run/cups
+    environment:
+      - PATH='/.venv/bin:$PATH'
+    network_mode: host
+    extra_hosts:
+      - "${hostname}:${IP_ADDRESS}"
