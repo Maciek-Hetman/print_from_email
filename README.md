@@ -9,10 +9,16 @@ pipenv shell
 mv config_sample.json config.json
 nano config.json
 python3 manage.py migrate
-python3 runserver_daemon
+python3 runserver_daemon.py
 ```
 
-You may have to adjust ip address in runserver_daemon.py if it defaults to 127:0.1.1:8000
+You may have to adjust ip address in runserver_daemon.py if it defaults to 127:0.1.1:8000 like so:
+
+``` python
+def run_server():
+    # ip_address = socket.gethostbyname(socket.gethostname()) + ":8000"
+    ip_address = "192.168.1.100:8000"
+```
 
 ## Docker setup
 
