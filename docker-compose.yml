@@ -11,6 +11,10 @@ services:
       - /var/run/cups:/var/run/cups
     environment:
       - PATH='/.venv/bin:$PATH'
+      - LANG=C.UTF-8
+      - LC_ALL=C.UTF-8
+      - PYTHONDONWRITEBYTECODE=1
+      - PYTHONFAULTHANDLER=1
     network_mode: host
     extra_hosts:
       - "${hostname}:${IP_ADDRESS}"
