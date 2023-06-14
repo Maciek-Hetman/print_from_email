@@ -17,10 +17,12 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework import routers
-from whitelist import views
+from whitelist import views as whitelist_views
+from file_formats import views as file_formats_views
 
 router = routers.DefaultRouter()
-router.register(r'whitelist', views.EmailView, 'email')
+router.register(r'whitelist', whitelist_views.EmailView, 'email')
+router.register(r'file_formats', file_formats_views.FileFormatView, 'file_format')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

@@ -8,6 +8,7 @@ django = "*"
 django-secrets = "*"
 django-rest-framework = "*"
 django-cors-headers = "*"
+pycups = "*"
 
 [dev-packages]
 

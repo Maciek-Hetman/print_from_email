@@ -1,5 +1,5 @@
 from django.apps import AppConfig
 
-class WhitelistConfig(AppConfig):
+class FileFormatsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'whitelist'
+    name = 'file_formats'

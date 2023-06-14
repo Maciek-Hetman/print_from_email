@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "cb1110a21f545306f6a37bfa60e59f1e00c8fed3f26d119fad6432d17fd23b0c"
+            "sha256": "4bc98353d172f31723d651e83eb0641a95b64f1698d09c1862d780c7cd1d744e"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -69,6 +69,13 @@
             ],
             "markers": "python_version >= '2.6' and python_version not in '3.0, 3.1, 3.2, 3.3'",
             "version": "==0.18.3"
+        },
+        "pycups": {
+            "hashes": [
+                "sha256:57434ce5f62548eb12949ca8217f066f4eeb21a5d6ab8b13471dce350e380c90"
+            ],
+            "index": "pypi",
+            "version": "==2.0.1"
         },
         "pytz": {
             "hashes": [
