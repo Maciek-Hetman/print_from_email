@@ -10,7 +10,6 @@ COPY Pipfile .
 COPY Pipfile.lock .
 RUN PIPENV_VENV_IN_PROJECT=1 pipenv install --deploy
 
-
 # Install application into container
 COPY . /app
 WORKDIR /app

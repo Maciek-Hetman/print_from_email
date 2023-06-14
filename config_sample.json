@@ -1,8 +1,8 @@
 {
     "email": "example@mail.com",
-    "imap": "example.com",
+    "imap": "imap.gmail.com",
     "password": "strongpassword123",
     "update_interval": 30,
-    "mailbox": "Your mailbox",
+    "mailbox": "INBOX",
     "imap_port": 993
 }
