@@ -9,6 +9,7 @@ django-secrets = "*"
 django-rest-framework = "*"
 django-cors-headers = "*"
 pycups = "*"
+requests = "*"
 
 [dev-packages]
 
