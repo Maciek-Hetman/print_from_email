@@ -1,6 +1,6 @@
 from django.core.management import execute_from_command_line
 from threading import Thread
-import logging, time, cups, os, socket
+import logging, time, cups, os, socket, email, imaplib, json
 
 def print_file(connection, printer, file_path: str = "/home/maciek/Pobrane/test.html", logger: logging.Logger = logging.getLogger(__name__), file_formats: list = ['html', 'pdf', 'jpg', 'jpeg', 'png']):
     if file_path.split('.')[-1] in file_formats:
@@ -12,7 +12,22 @@ def print_file(connection, printer, file_path: str = "/home/maciek/Pobrane/test.
     else:
         logger.error('File %s has unsupported format' % file_path)
 
-def daemon(logger: logging.Logger = logging.getLogger(__name__), time_interval: int = 60):
+def daemon(logger: logging.Logger = logging.getLogger(__name__)):
+    with open('config.json') as f:
+        config = json.load(f)
+
+        try:
+            email_address = config['email']
+            email_password = config['password']
+            imap_server = config['imap']
+            update_interval = config['update_interval']
+            imap_port = config['imap_port']
+        except KeyError:
+            logger.error('Config file is missing some values')
+            os.exit(1)
+    
+    logger.info('Daemon config: %s' % config)
+
     conn = cups.Connection()
     printers = list(conn.getPrinters().keys())
     logger.info('Available printers: %s' % printers)
@@ -23,8 +38,34 @@ def daemon(logger: logging.Logger = logging.getLogger(__name__), time_interval: 
     logger.info('Current printer: %s' % current_printer)
 
     while True:
+        imap = imaplib.IMAP4_SSL(imap_server, port=imap_port)
+        imap.login(email_address, email_password)
+        mailbox = "INBOX"
+        imap.select(mailbox)
+
+        status, data = imap.search(None, 'UNSEEN')
+        email_ids = data[0].split()
+
+        for email_id in email_ids:
+            status, data = imap.fetch(email_id, '(RFC822)')
+
+            raw_email = data[0][1]
+            msg = email.message_from_bytes(raw_email)
+
+            for part in msg.walk():
+                if part.get_content_disposition() is not None:
+                    filename = part.get_filename()
+                    save_path = os.path.join(os.getcwd(), filename)
+
+                    with open(save_path, 'wb') as fp:
+                        logger.info('Saving file %s to %s' % (filename, save_path))
+                        fp.write(part.get_payload(decode=True))
+        
+        imap.close()
+        imap.logout()
+
         print_file(connection=conn, printer=current_printer, logger=logger)
-        time.sleep(time_interval)
+        time.sleep(update_interval)
 
 
 def run_server():
