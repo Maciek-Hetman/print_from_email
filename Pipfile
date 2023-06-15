@@ -10,6 +10,7 @@ django-rest-framework = "*"
 django-cors-headers = "*"
 pycups = "*"
 requests = "*"
+netifaces = "*"
 
 [dev-packages]
 

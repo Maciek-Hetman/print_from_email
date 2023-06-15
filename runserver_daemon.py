@@ -1,6 +1,6 @@
 from django.core.management import execute_from_command_line
 from threading import Thread
-import logging, time, cups, os, socket, email, imaplib, json, requests
+import logging, time, cups, os, netifaces, email, imaplib, json, requests
 
 def print_file(connection, printer, file_path: str = "/home/maciek/Pobrane/test.html", logger: logging.Logger = logging.getLogger(__name__)):
     try:
@@ -144,10 +144,18 @@ def daemon(ip_address, logger: logging.Logger = logging.getLogger(__name__)):
         imap.close()
         imap.logout()
 
-
+def get_ip_address():
+    interfaces = netifaces.interfaces()
+    for interface in interfaces:
+        addresses = netifaces.ifaddresses(interface)
+        if netifaces.AF_INET in addresses:
+            ip_address = addresses[netifaces.AF_INET][0]['addr']
+            if ip_address.startswith("192"):
+                return ip_address
 
 def run_server():
-    ip_address = socket.gethostbyname(socket.gethostname()) + ":8000"
+    ip_address = get_ip_address() + ":8000"
+    # ip_address = "192.168.1.100:8000"
 
     FORMAT = '%(asctime)-15s - %(levelname)s - %(message)s'
     logging.basicConfig(format=FORMAT, level=logging.INFO)
