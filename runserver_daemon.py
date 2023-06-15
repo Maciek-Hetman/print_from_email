@@ -9,12 +9,49 @@ def print_file(connection, printer, file_path: str = "/home/maciek/Pobrane/test.
     except cups.IPPError:
         logger.error('File %s could not be printed on printer %s' % (file_path, printer))
 
+def update_printers(cups_connection, api_url, logger):
+    printers_scanned = list(cups_connection.getPrinters().keys())
+    printers_api = requests.get(api_url).json()
+
+    printer_api_keys = []
+    if len(printers_api) > 0:
+        for i in range(0, len(printers_api)):
+            if printers_api[i]['printer_key'] not in printers_scanned:
+                logger.info('Printer %s is no longer available, deleting' % printers_api[i]['printer_key'])
+                requests.delete(api_url+f'/{i+1}/', data={'printer_key': printers_api[i]['printer_key']})
+            else:
+                printer_api_keys.append(printers_api[i]['printer_key'])
+
+    for i in range(0, len(printers_scanned)):
+        if printers_scanned[i] not in printer_api_keys:
+            logger.info('New printer %s detected' % printers_scanned[i])
+            requests.post(api_url, data={'printer_key': printers_scanned[i], 'enabled': False})
+
+    enabled_printers = []
+    for printer in requests.get(api_url).json():
+        if printer['enabled']:
+            enabled_printers.append(printer['printer_key'])
+    
+    try:
+        logger.info("Enabled printer: %s" % enabled_printers[0])
+        return enabled_printers[0]
+    except IndexError:
+        try:
+            logger.warning("No printers enabled, using first printer")
+            return printers_scanned[0]
+        except IndexError:
+            logger.error('No printers available')
+            os.exit(1)
+    
+
+
 def daemon(ip_address, logger: logging.Logger = logging.getLogger(__name__)):
     # Initial sleep to wait for django server to start
     time.sleep(10)
 
-    whitelist_api_url = f"http://{ip_address}/api/whitelist"
-    file_formats_api_url = f"http://{ip_address}/api/file_formats"
+    whitelist_api_url = f"http://{ip_address}/api/whitelist/"
+    file_formats_api_url = f"http://{ip_address}/api/file_formats/"
+    printer_api_url = f"http://{ip_address}/api/printers/"
 
     with open('config.json') as f:
         config = json.load(f)
@@ -32,14 +69,10 @@ def daemon(ip_address, logger: logging.Logger = logging.getLogger(__name__)):
     
     logger.info('Daemon config: %s' % config)
 
-    conn = cups.Connection()
-    printers = list(conn.getPrinters().keys())
-    logger.info('Available printers: %s' % printers)
-
-    # Current printer config
-    # For now default is first printer in list
-    current_printer = printers[0]
+    cups_connection = cups.Connection()
+    current_printer = update_printers(cups_connection, printer_api_url, logger)
     logger.info('Current printer: %s' % current_printer)
+
 
     while True:
         time.sleep(update_interval)
@@ -96,7 +129,7 @@ def daemon(ip_address, logger: logging.Logger = logging.getLogger(__name__)):
                                         fp.write(part.get_payload(decode=True))
 
                                     logger.info('Printing file %s' % filename)
-                                    print_file(connection=conn, printer=current_printer, logger=logger, file_path=save_path)
+                                    print_file(connection=cups_connection, printer=current_printer, logger=logger, file_path=save_path)
                                     logger.info('File %s printed successfully' % filename)
 
                                     time.sleep(10)

@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'whitelist',
     'file_formats',
+    'printers',
     'corsheaders',
     'rest_framework',
 ]
