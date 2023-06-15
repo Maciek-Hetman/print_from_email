@@ -152,6 +152,8 @@ def get_ip_address():
             ip_address = addresses[netifaces.AF_INET][0]['addr']
             if ip_address.startswith("192"):
                 return ip_address
+    
+    return "127.0.0.1"
 
 def run_server():
     ip_address = get_ip_address() + ":8000"
