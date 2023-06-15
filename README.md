@@ -26,5 +26,6 @@ def run_server():
 - Rename `config_sample.json` to `config.json` and edit the file with your email credentials
 - Check your ip address with `ifconfig` or `ip addr`
 - Replace temporary IP address and hostname in `docker-compose.yml` with your IP address and hostname
+- Optionally: Replace admin credentials in Dockerfile. Default: `login: admin, password: password123`
 - `docker-compose build`
 - `docker-compose up`
