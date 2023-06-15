@@ -29,3 +29,7 @@ def run_server():
 - Optionally: Replace admin credentials in Dockerfile. Default: `login: admin, password: password123`
 - `docker-compose build`
 - `docker-compose up`
+
+## Cofiguration
+
+You can configure program in django admin web interface on `http://{Your ip address}:8000/admin`
