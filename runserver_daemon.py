@@ -1,6 +1,10 @@
 from django.core.management import execute_from_command_line
 from threading import Thread
-import logging, time, cups, os, netifaces, email, imaplib, json, requests
+from urllib.parse import quote
+import logging, time, cups, os, sys, netifaces, email, imaplib, json, requests, datetime
+
+class NoIPAddressFoundException(Exception):
+    pass
 
 def print_file(connection, printer, file_path: str = "/home/maciek/Pobrane/test.html", logger: logging.Logger = logging.getLogger(__name__)):
     try:
@@ -9,23 +13,57 @@ def print_file(connection, printer, file_path: str = "/home/maciek/Pobrane/test.
     except cups.IPPError:
         logger.error('File %s could not be printed on printer %s' % (file_path, printer))
 
+def request(api_url, action, logger, data={}):
+    try:
+        if action == "get":
+            return requests.get(api_url).json()
+        elif action == "delete":
+            requests.delete(api_url)
+        elif action == "post":
+            requests.post(api_url, data=data)
+        else:
+            logger.exception("Unknown action")
+            raise
+    except requests.exceptions.ConnectionError:
+        logger.exception("Failed to connect to REST API")
+        raise
+    except requests.exceptions.InvalidURL:
+        logger.exception("Invalid URL")
+        raise
+    except requests.exceptions.MissingSchema:
+        logger.exception("Missing URL schema")
+        raise
+    except:
+        logger.exception("Unknown error while connecting to REST API")
+        raise
+        
 def update_printers(cups_connection, api_url, logger):
-    printers_scanned = list(cups_connection.getPrinters().keys())
-    printers_api = requests.get(api_url).json()
+    try:
+        printers_scanned = list(cups_connection.getPrinters().keys())
+    except cups.IPPError as e:
+        if e == cups.IPP_OPERATION_NOT_SUPPORTED:
+            logger.exception("Not a CUPS server")
+            raise
+
+        logger.exception("CUPS server error")
+        raise
+
+    printers_api = request(api_url, "get", logger)
 
     printer_api_keys = []
     if len(printers_api) > 0:
-        for i in range(0, len(printers_api)):
-            if printers_api[i]['printer_key'] not in printers_scanned:
-                logger.info('Printer %s is no longer available, deleting' % printers_api[i]['printer_key'])
-                requests.delete(api_url+f'/{i+1}/', data={'printer_key': printers_api[i]['printer_key']})
-            else:
-                printer_api_keys.append(printers_api[i]['printer_key'])
+        for printer in printers_api:
+            if printer['printer_key'] not in printers_scanned:
+                logger.info('Printer %s is no longer available, deleting' % printer['printer_key'])
+                # requests.delete(api_url+f"{quote(printer['printer_key'])}/", data={'printer_key': printer})
+                request(api_url+f"{quote(printer['printer_key'])}/", "delete", logger)
+            else: 
+                printer_api_keys.append(printer['printer_key'])
 
-    for i in range(0, len(printers_scanned)):
-        if printers_scanned[i] not in printer_api_keys:
-            logger.info('New printer %s detected' % printers_scanned[i])
-            requests.post(api_url, data={'printer_key': printers_scanned[i], 'enabled': False})
+    for printer in printers_scanned:
+        if printer not in printer_api_keys:
+            logger.info('New printer %s detected' % printer)
+            request(api_url, "post", {'printer_key': printer, 'enabled': False}, logger)
 
     enabled_printers = []
     for printer in requests.get(api_url).json():
@@ -40,14 +78,14 @@ def update_printers(cups_connection, api_url, logger):
             logger.warning("No printers enabled, using first printer")
             return printers_scanned[0]
         except IndexError:
-            logger.error('No printers available')
-            os.exit(1)
+            logger.exception('No printers available')
+            raise
     
 
 
 def daemon(ip_address, logger: logging.Logger = logging.getLogger(__name__)):
-    # Initial sleep to wait for django server to start
-    time.sleep(10)
+    # Wait for django server to start
+    time.sleep(5)
 
     whitelist_api_url = f"http://{ip_address}/api/whitelist/"
     file_formats_api_url = f"http://{ip_address}/api/file_formats/"
@@ -64,18 +102,25 @@ def daemon(ip_address, logger: logging.Logger = logging.getLogger(__name__)):
             imap_port = config['imap_port']
             mailbox = config['mailbox']
         except KeyError:
-            logger.error('Config file is missing some values')
-            os.exit(1)
+            logger.exception('Config file is missing some values')
+            raise
     
     logger.info('Daemon config: %s' % config)
 
-    cups_connection = cups.Connection()
-    current_printer = update_printers(cups_connection, printer_api_url, logger)
-    logger.info('Current printer: %s' % current_printer)
-
+    try:
+        cups_connection = cups.Connection()
+    except RuntimeError:
+        logger.exception("Failed to connect to CUPS server")
+        raise
+    except cups.IPPError:
+        logger.exception("CUPS server error")
+        raise
 
     while True:
         time.sleep(update_interval)
+
+        current_printer = update_printers(cups_connection, printer_api_url, logger)
+        logger.info('Current printer: %s' % current_printer)
 
         whitelist_response = requests.get(whitelist_api_url)
         file_formats_response = requests.get(file_formats_api_url)
@@ -84,15 +129,15 @@ def daemon(ip_address, logger: logging.Logger = logging.getLogger(__name__)):
             email_whitelist = whitelist_response.json()
             logger.info("Whitelist: %s" % email_whitelist)
         else:
-            logger.error("Error:", whitelist_response.status_code)
-            os.exit(1)
+            logger.exception("Error:", whitelist_response.status_code)
+            raise
         
         if file_formats_response.status_code == 200:
             file_formats = file_formats_response.json()
             logger.info("File formats: %s" % file_formats)
         else:
-            logger.error("Error:", file_formats_response.status_code)
-            os.exit(1)
+            logger.exception("Error:", file_formats_response.status_code)
+            raise
 
         imap = imaplib.IMAP4_SSL(imap_server, port=imap_port)
         imap.login(email_address, email_password)
@@ -133,10 +178,10 @@ def daemon(ip_address, logger: logging.Logger = logging.getLogger(__name__)):
                                     logger.info('File %s printed successfully' % filename)
 
                                     time.sleep(10)
-
+                                    
                                     logger.info('Removing file %s' % filename)
                                     os.remove(save_path)
-                                
+
                                     break
 
                     break
@@ -153,16 +198,39 @@ def get_ip_address():
             if ip_address.startswith("192"):
                 return ip_address
     
-    return "127.0.0.1"
+    raise NoIPAddressFoundException("No IP address found")
 
 def run_server():
-    ip_address = get_ip_address() + ":8000"
+    FORMAT = '%(asctime)-15s - %(levelname)s - %(message)s'
+
+    logging.basicConfig(level=logging.INFO)
+    
+    file_handler = logging.FileHandler(f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log")
+    file_handler.setLevel(logging.INFO)
+    
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    
+    formatter = logging.Formatter(FORMAT)
+    
+    file_handler.setFormatter(formatter)
+    
+    console_handler.setFormatter(formatter)
+    
+    logger = logging.getLogger(__name__)
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+
     # ip_address = "192.168.1.100:8000"
 
-    FORMAT = '%(asctime)-15s - %(levelname)s - %(message)s'
-    logging.basicConfig(format=FORMAT, level=logging.INFO)
-    logger = logging.getLogger(__name__)
-    logger.info('Starting runserver daemon')
+    if 'ip_address' not in locals():
+        try:
+            ip_address = get_ip_address() + ":8000"
+        except NoIPAddressFoundException as e:
+            logger.warning("Cannot find IP address, please set it manually in runserver_daemon.py")
+            logger.error('%s - exiting' % str(e))
+            sys.exit(1)
+    
 
     thread = Thread(target=daemon, args=(ip_address, logger), daemon=True)
     logger.info('Starting daemon thread')

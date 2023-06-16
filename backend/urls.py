@@ -24,7 +24,7 @@ from printers import views as printers_views
 router = routers.DefaultRouter()
 router.register(r'whitelist', whitelist_views.EmailView, 'email')
 router.register(r'file_formats', file_formats_views.FileFormatView, 'file_format')
-router.register(r'printers', printers_views.PrinterView, 'printer')
+router.register(r'printers', printers_views.PrinterViewSet, 'printer')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
